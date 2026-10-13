@@ -4,6 +4,8 @@ const BASE = 'https://calc.domainepublic.net';
 const GUEST_ROOM = '286gugy2seqx';
 const VENUE_ROOM = 'xrplrbue3waf';
 const SYNC_MS = 15000;
+const LOCAL_GUESTS_KEY = 'wedding_planner_guests_v8';
+const LOCAL_VENUES_KEY = 'wedding_planner_venues_v8';
 const GUEST_CATEGORIES = ['Invitati Raul','Invitati Andreea','Invitati comuni'];
 
 const state = {
@@ -34,9 +36,29 @@ function csvEscape(v){const s=String(v??'');return /[",\r\n]/.test(s)?`"${s.repl
 function rowsToCsv(rows){return rows.map(r=>r.map(csvEscape).join(',')).join('\n')}
 function parseCsv(text){const rows=[];let row=[],field='',q=false;for(let i=0;i<text.length;i++){const c=text[i];if(q){if(c==='"'&&text[i+1]==='"'){field+='"';i++}else if(c==='"')q=false;else field+=c}else if(c==='"')q=true;else if(c===','){row.push(field);field=''}else if(c==='\n'){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field=''}else field+=c}if(field||row.length){row.push(field.replace(/\r$/,''));rows.push(row)}return rows}
 function headerIndex(h,n){return h.findIndex(x=>String(x||'').trim().toLowerCase()===n)}
-function bool(v){return String(v||'').toLowerCase()==='true'}
+function bool(v){const x=String(v??'').trim().toLowerCase();return ['true','1','yes','y','da','x','on'].includes(x)}
 function timestamp(r){const t=Date.parse(r?.updatedAt||'');return Number.isFinite(t)?t:0}
 function mergeRecords(...sets){const m=new Map();sets.flat().forEach(r=>{if(!r?.id)return;const old=m.get(r.id);if(!old||timestamp(r)>=timestamp(old))m.set(r.id,{...r})});return [...m.values()]}
+
+function loadLocal(key){
+  try{
+    const raw=localStorage.getItem(key);
+    if(!raw)return[];
+    const data=JSON.parse(raw);
+    return Array.isArray(data)?data:[];
+  }catch(e){console.warn('Cache local invalid',e);return[]}
+}
+function saveLocal(key,records){
+  try{localStorage.setItem(key,JSON.stringify(records||[]))}catch(e){console.warn('Cache local indisponibil',e)}
+}
+function persistLocal(){saveLocal(LOCAL_GUESTS_KEY,state.guests);saveLocal(LOCAL_VENUES_KEY,state.venues)}
+function sameGuestPersistence(a,b){return !!a&&!!b&&String(a.id)===String(b.id)&&!!a.crossedOut===!!b.crossedOut&&num(a.sortOrder)===num(b.sortOrder)&&String(a.updatedAt||'')===String(b.updatedAt||'')}
+async function verifyGuestSave(expected){
+  const remote=parseGuests(await getCsv(GUEST_ROOM));
+  const missing=expected.filter(x=>{const r=remote.find(y=>y.id===x.id);return !sameGuestPersistence(r,x)});
+  if(missing.length)throw new Error(`Serverul nu a confirmat ${missing.length} modificări de invitați.`);
+  return remote;
+}
 function activeGuests(){return state.guests.filter(x=>!x.deleted)}
 function activeVenues(){return state.venues.filter(x=>!x.deleted)}
 
@@ -55,11 +77,40 @@ function csvReadUrls(room){const r=encodeURIComponent(room);return [`${BASE}/_/$
 async function getCsv(room){let last;for(const url of csvReadUrls(room)){try{const r=await fetchWithTimeout(url,{cache:'no-store'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.text()}catch(e){last=e}}throw new Error(last?.message||'Citire eșuată')}
 async function putCsv(room,csv){const url=`${BASE}/_/${encodeURIComponent(room)}`;const r=await fetchWithTimeout(url,{method:'PUT',cache:'no-store',headers:{'Content-Type':'text/csv;charset=UTF-8'},body:csv},20000);if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.text().catch(()=>'')}
 
-async function saveCollection(kind){const isGuest=kind==='guest',room=isGuest?GUEST_ROOM:VENUE_ROOM,parse=isGuest?parseGuests:parseVenues,toCsv=isGuest?guestsCsv:venuesCsv,key=isGuest?'guests':'venues',saving=isGuest?'savingGuests':'savingVenues',lastSave=isGuest?'lastGuestSaveAt':'lastVenueSaveAt';if(state[saving])return;state[saving]=true;try{setSync('Se salvează…');let remote=[];try{remote=parse(await getCsv(room))}catch(_){remote=[]}const merged=mergeRecords(remote,state[key]);await putCsv(room,toCsv(merged));state[key]=merged;state[lastSave]=Date.now();setSync('Salvat live ✓','ok');renderAll()}finally{state[saving]=false}}
+async function saveCollection(kind){
+  const isGuest=kind==='guest',room=isGuest?GUEST_ROOM:VENUE_ROOM,parse=isGuest?parseGuests:parseVenues,toCsv=isGuest?guestsCsv:venuesCsv,key=isGuest?'guests':'venues',saving=isGuest?'savingGuests':'savingVenues',lastSave=isGuest?'lastGuestSaveAt':'lastVenueSaveAt';
+  // Nu pierdem modificările dacă o salvare este deja în curs: așteptăm și reluăm cu starea curentă.
+  while(state[saving])await new Promise(r=>setTimeout(r,120));
+  state[saving]=true;
+  try{
+    setSync('Se salvează…');
+    persistLocal();
+    let remote=[];try{remote=parse(await getCsv(room))}catch(_){remote=[]}
+    const merged=mergeRecords(remote,state[key]);
+    let lastError;
+    for(let attempt=0;attempt<3;attempt++){
+      try{
+        await putCsv(room,toCsv(merged));
+        if(isGuest){
+          await new Promise(r=>setTimeout(r,500+attempt*500));
+          const verified=await verifyGuestSave(merged);
+          state[key]=mergeRecords(verified,merged);
+        }else state[key]=merged;
+        state[lastSave]=Date.now();
+        persistLocal();
+        setSync('Salvat live ✓','ok');
+        renderAll();
+        return;
+      }catch(e){lastError=e;console.warn(`Salvare ${kind} încercarea ${attempt+1}/3`,e);await new Promise(r=>setTimeout(r,700+attempt*700))}
+    }
+    throw lastError||new Error('Salvarea nu a putut fi confirmată.');
+  }finally{state[saving]=false}
+}
 
 async function syncAll({notify=false}={}){if(state.syncing||state.savingGuests||state.savingVenues)return;state.syncing=true;setSync('Se conectează…');let ge=null,ve=null;try{
-  try{const remote=parseGuests(await getCsv(GUEST_ROOM));state.guests=Date.now()-state.lastGuestSaveAt<8000?mergeRecords(remote,state.guests):remote}catch(e){ge=e;console.error(e)}
-  try{const remote=parseVenues(await getCsv(VENUE_ROOM));state.venues=Date.now()-state.lastVenueSaveAt<8000?mergeRecords(remote,state.venues):remote}catch(e){ve=e;console.error(e)}
+  // Îmbinăm mereu datele remote cu cache-ul local pe baza updatedAt. Astfel un refresh nu poate șterge o modificare locală recentă.
+  try{const remote=parseGuests(await getCsv(GUEST_ROOM));state.guests=mergeRecords(remote,state.guests,loadLocal(LOCAL_GUESTS_KEY));saveLocal(LOCAL_GUESTS_KEY,state.guests)}catch(e){ge=e;console.error(e);state.guests=mergeRecords(state.guests,loadLocal(LOCAL_GUESTS_KEY))}
+  try{const remote=parseVenues(await getCsv(VENUE_ROOM));state.venues=mergeRecords(remote,state.venues,loadLocal(LOCAL_VENUES_KEY));saveLocal(LOCAL_VENUES_KEY,state.venues)}catch(e){ve=e;console.error(e);state.venues=mergeRecords(state.venues,loadLocal(LOCAL_VENUES_KEY))}
   renderAll();
   if(ge&&ve){setSync('Foile nu pot fi citite','error');if(notify)showToast('Sincronizarea a eșuat pentru ambele foi.')}else if(ge||ve){setSync('Sincronizare parțială','error');if(notify)showToast(ge?'Invitații nu au putut fi citiți.':'Sălile nu au putut fi citite.')}else{setSync(`Live ✓ · ${new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'})}`,'ok');if(notify)showToast('Datele au fost recitite din foile live.')}
 }finally{state.syncing=false}}
@@ -140,14 +191,14 @@ function renderAvailability(){if(!state.selectedDate){el.selectedWeekendTitle.te
 function renderAll(){renderStats();renderGuests();renderVenues();renderCalendar();renderAvailability()}
 
 function openGuest(id='',category=state.activeGuestCategory){el.guestForm.reset();el.guestId.value='';el.guestAdults.value=1;el.guestChildren.value=0;el.guestStatus.value='În așteptare';el.guestCrossed.checked=false;el.guestCategory.value=category||GUEST_CATEGORIES[0];el.guestDialogTitle.textContent=`Adaugă invitat · ${categoryShort(el.guestCategory.value)}`;el.deleteGuest.hidden=true;if(id){const g=state.guests.find(x=>x.id===id);if(!g)return;el.guestId.value=g.id;el.guestName.value=g.name;el.guestCategory.value=g.category;el.guestStatus.value=g.status;el.guestAdults.value=g.adults;el.guestChildren.value=g.children;el.guestPhone.value=g.phone;el.guestTable.value=g.table;el.guestMenu.value=g.menu;el.guestNotes.value=g.notes;el.guestCrossed.checked=!!g.crossedOut;el.guestDialogTitle.textContent='Editează invitat';el.deleteGuest.hidden=false}el.guestDialog.showModal()}
-async function handleGuestSubmit(e){e.preventDefault();const name=el.guestName.value.trim(),adults=num(el.guestAdults.value),children=num(el.guestChildren.value);if(!name||adults<0||children<0){showToast('Completează numele și numărul de persoane.');return}const id=el.guestId.value||crypto.randomUUID(),old=state.guests.find(x=>x.id===id),category=el.guestCategory.value,crossedOut=!!el.guestCrossed.checked,statusChangedGroup=!!old&&(old.category!==category||!!old.crossedOut!==crossedOut),sameBucket=activeGuests().filter(x=>x.category===category&&!!x.crossedOut===crossedOut&&x.id!==id),bucketMax=Math.max(0,...sameBucket.map(x=>num(x.sortOrder))),sortOrder=old&&!statusChangedGroup&&num(old.sortOrder)>0?num(old.sortOrder):bucketMax+100,r={id,name,category,status:el.guestStatus.value,adults,children,phone:el.guestPhone.value.trim(),table:el.guestTable.value.trim(),menu:el.guestMenu.value.trim(),notes:el.guestNotes.value.trim(),crossedOut,sortOrder,updatedAt:new Date().toISOString(),deleted:false};state.guests=old?state.guests.map(x=>x.id===id?r:x):[...state.guests,r];el.guestDialog.close();renderAll();try{await saveCollection('guest');showToast(old?'Invitat actualizat.':'Invitat adăugat.')}catch(err){console.error(err);showToast(`Salvarea a eșuat: ${err.message}`)}}
-async function deleteGuest(){const id=el.guestId.value,g=state.guests.find(x=>x.id===id);if(!g)return;state.guests=state.guests.map(x=>x.id===id?{...x,deleted:true,updatedAt:new Date().toISOString()}:x);el.guestDialog.close();renderAll();try{await saveCollection('guest');showToast('Invitat șters.')}catch(err){console.error(err);showToast(`Ștergerea a eșuat: ${err.message}`)}}
+async function handleGuestSubmit(e){e.preventDefault();const name=el.guestName.value.trim(),adults=num(el.guestAdults.value),children=num(el.guestChildren.value);if(!name||adults<0||children<0){showToast('Completează numele și numărul de persoane.');return}const id=el.guestId.value||crypto.randomUUID(),old=state.guests.find(x=>x.id===id),category=el.guestCategory.value,crossedOut=!!el.guestCrossed.checked,statusChangedGroup=!!old&&(old.category!==category||!!old.crossedOut!==crossedOut),sameBucket=activeGuests().filter(x=>x.category===category&&!!x.crossedOut===crossedOut&&x.id!==id),bucketMax=Math.max(0,...sameBucket.map(x=>num(x.sortOrder))),sortOrder=old&&!statusChangedGroup&&num(old.sortOrder)>0?num(old.sortOrder):bucketMax+100,r={id,name,category,status:el.guestStatus.value,adults,children,phone:el.guestPhone.value.trim(),table:el.guestTable.value.trim(),menu:el.guestMenu.value.trim(),notes:el.guestNotes.value.trim(),crossedOut,sortOrder,updatedAt:new Date().toISOString(),deleted:false};state.guests=old?state.guests.map(x=>x.id===id?r:x):[...state.guests,r];persistLocal();el.guestDialog.close();renderAll();try{await saveCollection('guest');showToast(old?'Invitat actualizat.':'Invitat adăugat.')}catch(err){console.error(err);showToast(`Salvarea a eșuat: ${err.message}`)}}
+async function deleteGuest(){const id=el.guestId.value,g=state.guests.find(x=>x.id===id);if(!g)return;state.guests=state.guests.map(x=>x.id===id?{...x,deleted:true,updatedAt:new Date().toISOString()}:x);persistLocal();el.guestDialog.close();renderAll();try{await saveCollection('guest');showToast('Invitat șters.')}catch(err){console.error(err);showToast(`Ștergerea a eșuat: ${err.message}`)}}
 
 function renderDateChips(){el.availabilityChips.innerHTML='';state.venueDraftDates.slice().sort().forEach(date=>{const c=document.createElement('span');c.className='date-chip';c.innerHTML=`${esc(fmtDate(date))}<button type="button" aria-label="Elimină">×</button>`;c.querySelector('button').onclick=()=>{state.venueDraftDates=state.venueDraftDates.filter(x=>x!==date);renderDateChips()};el.availabilityChips.appendChild(c)})}
 function addAvailabilityDate(){const date=el.venueAvailabilityDate.value;if(!/^202[78]-\d{2}-\d{2}$/.test(date)){showToast('Alege o dată din 2027 sau 2028.');return}const day=fromISO(date).getDay();if(day!==0&&day!==6){showToast('Calendarul urmărește weekend-urile. Alege sâmbătă sau duminică.');return}if(!state.venueDraftDates.includes(date))state.venueDraftDates.push(date);el.venueAvailabilityDate.value='';renderDateChips()}
 function openVenue(id=''){el.venueForm.reset();el.venueId.value='';state.venueDraftDates=[];el.venueDialogTitle.textContent='Adaugă sală';el.deleteVenue.hidden=true;if(id){const v=state.venues.find(x=>x.id===id);if(!v)return;el.venueId.value=v.id;el.venueName.value=v.name;el.venueCity.value=v.city;el.venueAddress.value=v.address;el.venueCapacity.value=v.capacity||'';el.venuePrice.value=v.price||'';el.venueMenuPrice.value=v.menuPrice||'';el.venueDeposit.value=v.deposit||'';el.venueContact.value=v.contact;el.venuePhone.value=v.phone;el.venueWebsite.value=v.website;el.venueParking.value=v.parking||'Da';el.venueAccommodation.value=v.accommodation||'Nu';el.venueFeatures.value=v.features;el.venueNotes.value=v.notes;state.venueDraftDates=[...(v.availability||[])];el.venueDialogTitle.textContent='Editează sală';el.deleteVenue.hidden=false}renderDateChips();el.venueDialog.showModal()}
-async function handleVenueSubmit(e){e.preventDefault();const name=el.venueName.value.trim(),capacity=num(el.venueCapacity.value);if(!name||capacity<1){showToast('Completează numele sălii și capacitatea.');return}const id=el.venueId.value||crypto.randomUUID(),old=state.venues.find(x=>x.id===id),r={id,name,city:el.venueCity.value.trim(),address:el.venueAddress.value.trim(),capacity,price:num(el.venuePrice.value),menuPrice:num(el.venueMenuPrice.value),deposit:num(el.venueDeposit.value),contact:el.venueContact.value.trim(),phone:el.venuePhone.value.trim(),website:el.venueWebsite.value.trim(),parking:el.venueParking.value,accommodation:el.venueAccommodation.value,features:el.venueFeatures.value.trim(),availability:[...new Set(state.venueDraftDates)].sort(),notes:el.venueNotes.value.trim(),updatedAt:new Date().toISOString(),deleted:false};state.venues=old?state.venues.map(x=>x.id===id?r:x):[...state.venues,r];el.venueDialog.close();renderAll();try{await saveCollection('venue');showToast(old?'Sala a fost actualizată.':'Sala a fost adăugată.')}catch(err){console.error(err);showToast(`Salvarea a eșuat: ${err.message}`)}}
-async function deleteVenue(){const id=el.venueId.value,v=state.venues.find(x=>x.id===id);if(!v)return;state.venues=state.venues.map(x=>x.id===id?{...x,deleted:true,updatedAt:new Date().toISOString()}:x);el.venueDialog.close();renderAll();try{await saveCollection('venue');showToast('Sala a fost ștearsă.')}catch(err){console.error(err);showToast(`Ștergerea a eșuat: ${err.message}`)}}
+async function handleVenueSubmit(e){e.preventDefault();const name=el.venueName.value.trim(),capacity=num(el.venueCapacity.value);if(!name||capacity<1){showToast('Completează numele sălii și capacitatea.');return}const id=el.venueId.value||crypto.randomUUID(),old=state.venues.find(x=>x.id===id),r={id,name,city:el.venueCity.value.trim(),address:el.venueAddress.value.trim(),capacity,price:num(el.venuePrice.value),menuPrice:num(el.venueMenuPrice.value),deposit:num(el.venueDeposit.value),contact:el.venueContact.value.trim(),phone:el.venuePhone.value.trim(),website:el.venueWebsite.value.trim(),parking:el.venueParking.value,accommodation:el.venueAccommodation.value,features:el.venueFeatures.value.trim(),availability:[...new Set(state.venueDraftDates)].sort(),notes:el.venueNotes.value.trim(),updatedAt:new Date().toISOString(),deleted:false};state.venues=old?state.venues.map(x=>x.id===id?r:x):[...state.venues,r];persistLocal();el.venueDialog.close();renderAll();try{await saveCollection('venue');showToast(old?'Sala a fost actualizată.':'Sala a fost adăugată.')}catch(err){console.error(err);showToast(`Salvarea a eșuat: ${err.message}`)}}
+async function deleteVenue(){const id=el.venueId.value,v=state.venues.find(x=>x.id===id);if(!v)return;state.venues=state.venues.map(x=>x.id===id?{...x,deleted:true,updatedAt:new Date().toISOString()}:x);persistLocal();el.venueDialog.close();renderAll();try{await saveCollection('venue');showToast('Sala a fost ștearsă.')}catch(err){console.error(err);showToast(`Ștergerea a eșuat: ${err.message}`)}}
 
 function exportExcel(){if(typeof XLSX==='undefined'){showToast('Modulul Excel nu s-a încărcat.');return}const guestRows=activeGuests().map(g=>({'Categorie':g.category,'Nume / familie':g.name,'Retras / tăiat':g.crossedOut?'Da':'Nu','Status RSVP':g.status,'Adulți':g.adults,'Copii':g.children,'Total persoane':g.adults+g.children,'Inclus în total':g.crossedOut?'Nu':'Da','Telefon':g.phone,'Masa':g.table,'Preferințe meniu':g.menu,'Notițe':g.notes}));const venueRows=activeVenues().map(v=>({'Sală':v.name,'Oraș':v.city,'Adresă':v.address,'Capacitate':v.capacity,'Preț închiriere (€)':v.price,'Meniu / persoană (€)':v.menuPrice,'Avans (€)':v.deposit,'Contact':v.contact,'Telefon':v.phone,'Website':v.website,'Parcare':v.parking,'Cazare':v.accommodation,'Facilități':v.features,'Zile disponibile':(v.availability||[]).join(', '),'Notițe':v.notes}));const availabilityRows=[];activeVenues().forEach(v=>(v.availability||[]).forEach(date=>availabilityRows.push({'Data':date,'Zi':fromISO(date).toLocaleDateString('ro-RO',{weekday:'long'}),'Sală':v.name,'Oraș':v.city,'Capacitate':v.capacity,'Meniu / persoană (€)':v.menuPrice,'Preț închiriere (€)':v.price})));const wb=XLSX.utils.book_new();const wsG=XLSX.utils.json_to_sheet(guestRows.length?guestRows:[{'Categorie':'','Nume / familie':'Fără invitați'}]);const wsV=XLSX.utils.json_to_sheet(venueRows.length?venueRows:[{'Sală':'Fără săli'}]);const wsA=XLSX.utils.json_to_sheet(availabilityRows.length?availabilityRows:[{'Data':'','Sală':'Fără disponibilități'}]);wsG['!cols']=[{wch:20},{wch:28},{wch:14},{wch:16},{wch:9},{wch:9},{wch:14},{wch:14},{wch:18},{wch:14},{wch:25},{wch:36}];wsV['!cols']=Array(15).fill({wch:18});wsV['!cols'][0]={wch:28};wsV['!cols'][12]={wch:32};wsV['!cols'][13]={wch:44};wsV['!cols'][14]={wch:36};wsA['!cols']=[{wch:12},{wch:12},{wch:28},{wch:18},{wch:12},{wch:20},{wch:20}];XLSX.utils.book_append_sheet(wb,wsG,'Invitati');XLSX.utils.book_append_sheet(wb,wsV,'Sali');XLSX.utils.book_append_sheet(wb,wsA,'Disponibilitate');XLSX.writeFile(wb,'nunta_Raul_Andreea_date_complete.xlsx');showToast('Excel-ul complet a fost generat.')}
 
@@ -163,4 +214,4 @@ $('#syncButton').onclick=()=>syncAll({notify:true});$('#exportExcel').onclick=ex
 window.addEventListener('online',()=>syncAll({notify:true}));document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAll()});setInterval(()=>{if(!document.hidden&&!state.savingGuests&&!state.savingVenues)syncAll()},SYNC_MS);
 window.addEventListener('error',e=>{console.error(e.error||e.message);setSync(`Eroare aplicație: ${e.message}`,'error')});window.addEventListener('unhandledrejection',e=>{console.error(e.reason);setSync(`Eroare: ${e.reason?.message||e.reason}`,'error')});
 
-renderAll();syncAll();
+state.guests=loadLocal(LOCAL_GUESTS_KEY);state.venues=loadLocal(LOCAL_VENUES_KEY);renderAll();syncAll();
