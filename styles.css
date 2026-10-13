@@ -76,3 +76,170 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:inherit}
   .guest-cell{min-height:34px;padding:.24rem .32rem;font-size:.56rem}
   .guest-cell--name strong{font-size:.6rem}
 }
+
+/* v4 — mobile guest list behaves like a true compact spreadsheet row */
+@media(max-width:720px){
+  .guest-table-wrap{
+    overflow-x:auto;
+    overflow-y:hidden;
+    border:1px solid var(--sheet-grid);
+    border-radius:8px;
+    background:#fff;
+    scrollbar-width:thin;
+  }
+
+  .guest-table-head,
+  .guest-row{
+    min-width:620px;
+    grid-template-columns:150px 80px 42px 96px 56px 164px 32px;
+    grid-auto-flow:column;
+    grid-auto-rows:32px;
+  }
+
+  .guest-table-head{
+    position:sticky;
+    top:0;
+    z-index:6;
+    height:30px;
+    min-height:30px;
+  }
+
+  .guest-table-head span{
+    display:flex;
+    align-items:center;
+    min-width:0;
+    height:30px;
+    padding:.22rem .3rem;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+    font-size:.48rem;
+  }
+
+  .guest-row{
+    min-height:32px;
+    height:32px;
+    align-items:stretch;
+  }
+
+  /* Reset the older mobile card-layout positioning completely. */
+  .guest-row > .guest-cell{
+    grid-column:auto !important;
+    grid-row:auto !important;
+    justify-self:stretch !important;
+    align-self:stretch !important;
+    text-align:left !important;
+    min-width:0;
+    min-height:32px;
+    height:32px;
+    padding:.2rem .3rem;
+    margin:0 !important;
+    display:flex;
+    align-items:center;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+    line-height:1.05;
+    font-size:.55rem;
+    border-right:1px solid var(--sheet-grid);
+  }
+
+  .guest-row > .guest-cell::before{display:none !important;content:none !important}
+
+  .guest-row > .guest-cell--name{
+    position:sticky;
+    left:0;
+    z-index:3;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:flex-start;
+    background:inherit;
+    box-shadow:1px 0 0 var(--sheet-grid);
+  }
+
+  .guest-row > .guest-cell--name strong{
+    width:100%;
+    font-size:.59rem;
+    line-height:1.05;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .guest-row > .guest-cell--name small{
+    width:100%;
+    margin-top:2px;
+    font-size:.45rem;
+    line-height:1;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .guest-row > .guest-cell--people{
+    justify-content:center;
+    font-variant-numeric:tabular-nums;
+  }
+
+  .guest-row > .guest-cell--details{
+    display:block;
+    padding-top:.32rem;
+    color:#6f6268;
+  }
+
+  .guest-row > .guest-cell--action{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:0;
+  }
+
+  .guest-row .pill{
+    max-width:100%;
+    padding:.13rem .25rem;
+    border-radius:4px;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+    font-size:.46rem;
+    line-height:1.1;
+  }
+
+  .guest-row .mini-button{
+    width:22px;
+    height:22px;
+    min-height:22px;
+    padding:0;
+    border-radius:5px;
+    font-size:.62rem;
+  }
+
+  .guest-sheet-title{
+    min-height:38px;
+    padding:.4rem .5rem;
+  }
+
+  .guest-sheet-title h3{font-size:.66rem}
+  .guest-sheet-title>strong{font-size:.56rem;padding:.16rem .3rem}
+}
+
+@media(max-width:420px){
+  .guest-table-head,
+  .guest-row{
+    min-width:590px;
+    grid-template-columns:142px 76px 40px 90px 52px 158px 32px;
+  }
+
+  .guest-row,
+  .guest-row > .guest-cell{
+    min-height:30px;
+    height:30px;
+  }
+
+  .guest-table-head,
+  .guest-table-head span{
+    height:28px;
+    min-height:28px;
+  }
+}
