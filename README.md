@@ -42,3 +42,11 @@ Aplicația citește CSV din EtherCalc și salvează folosind endpoint-ul compati
 Pune `index.html`, `styles.css` și `app.js` în același folder pe GitHub Pages sau pe orice hosting static HTTPS.
 
 > Notă: sincronizarea direct din browser depinde de politica CORS a serverului EtherCalc. Implementarea urmează aceeași metodă ca aplicația sursă: citire CSV și scriere PUT pe endpoint-ul foii.
+
+## Interfață v2 — liste compacte
+
+- layout mai compact, optimizat pentru desktop și mobil;
+- invitații sunt afișați în taburi separate: **Raul**, **Andreea** și **Comuni**;
+- butonul de adăugare preselectează automat categoria tabului activ;
+- totalurile generale rămân vizibile indiferent de lista selectată;
+- lista invitaților are aspect de spreadsheet/Excel pe desktop și carduri compacte pe mobil.
