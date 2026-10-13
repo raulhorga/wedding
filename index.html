@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#fbf7f8" />
   <title>Raul & Andreea — Wedding Planner</title>
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
   <header class="topbar">
@@ -67,18 +67,24 @@
       <div class="guest-sheets">
         <section class="panel guest-group is-active" data-category="Invitati Raul">
           <div class="panel__header guest-sheet-title"><div><span class="category-dot dot-raul"></span><h3>Lista invitaților lui Raul</h3></div><strong id="countRaul">0</strong></div>
-          <div class="guest-table-head"><span>Nume / familie</span><span>RSVP</span><span>Pers.</span><span>Telefon</span><span>Masă</span><span>Meniu / notițe</span><span></span></div>
-          <div id="guestsRaul" class="guest-list"></div>
+          <div class="guest-table-wrap">
+            <div class="guest-table-head"><span>Nume / familie</span><span>RSVP</span><span>Pers.</span><span>Telefon</span><span>Masă</span><span>Meniu / notițe</span><span></span></div>
+            <div id="guestsRaul" class="guest-list"></div>
+          </div>
         </section>
         <section class="panel guest-group" data-category="Invitati Andreea">
           <div class="panel__header guest-sheet-title"><div><span class="category-dot dot-andreea"></span><h3>Lista invitaților Andreei</h3></div><strong id="countAndreea">0</strong></div>
-          <div class="guest-table-head"><span>Nume / familie</span><span>RSVP</span><span>Pers.</span><span>Telefon</span><span>Masă</span><span>Meniu / notițe</span><span></span></div>
-          <div id="guestsAndreea" class="guest-list"></div>
+          <div class="guest-table-wrap">
+            <div class="guest-table-head"><span>Nume / familie</span><span>RSVP</span><span>Pers.</span><span>Telefon</span><span>Masă</span><span>Meniu / notițe</span><span></span></div>
+            <div id="guestsAndreea" class="guest-list"></div>
+          </div>
         </section>
         <section class="panel guest-group" data-category="Invitati comuni">
           <div class="panel__header guest-sheet-title"><div><span class="category-dot dot-common"></span><h3>Lista invitaților comuni</h3></div><strong id="countCommon">0</strong></div>
-          <div class="guest-table-head"><span>Nume / familie</span><span>RSVP</span><span>Pers.</span><span>Telefon</span><span>Masă</span><span>Meniu / notițe</span><span></span></div>
-          <div id="guestsCommon" class="guest-list"></div>
+          <div class="guest-table-wrap">
+            <div class="guest-table-head"><span>Nume / familie</span><span>RSVP</span><span>Pers.</span><span>Telefon</span><span>Masă</span><span>Meniu / notițe</span><span></span></div>
+            <div id="guestsCommon" class="guest-list"></div>
+          </div>
         </section>
       </div>
     </section>
@@ -179,6 +185,6 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
