@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#fbf7f8" />
   <title>Raul & Andreea — Wedding Planner</title>
-  <link rel="stylesheet" href="styles.css?v=4" />
+  <link rel="stylesheet" href="styles.css?v=6" />
 </head>
 <body>
   <header class="topbar">
@@ -153,6 +153,7 @@
         <label class="field"><span>Masa</span><input id="guestTable" maxlength="40" placeholder="Ex: Masa 7" /></label>
         <label class="field field--full"><span>Preferințe / meniu</span><input id="guestMenu" maxlength="120" placeholder="Ex: vegetarian, fără gluten" /></label>
         <label class="field field--full"><span>Notițe</span><textarea id="guestNotes" maxlength="300" rows="3" placeholder="Cazare, transport, relație, alte detalii…"></textarea></label>
+        <label class="guest-cross-toggle field--full"><input id="guestCrossed" type="checkbox" /><span><strong>Marchează invitatul ca retras / tăiat</strong><small>Rămâne în listă și în Excel, dar apare tăiat și nu intră în totalul persoanelor.</small></span></label>
       </div>
       <div class="modal__footer"><button id="deleteGuest" class="button button--danger-soft" type="button" hidden>Șterge</button><span class="modal-spacer"></span><button id="cancelGuest" class="button button--ghost" type="button">Renunță</button><button class="button button--primary" type="submit">Salvează</button></div>
     </form>
@@ -185,6 +186,7 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
