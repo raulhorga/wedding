@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#fbf7f8" />
+  <title>Raul & Andreea — Wedding Planner</title>
+  <link rel="stylesheet" href="styles.css?v=1" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand__mark" aria-hidden="true">♥</div>
+      <div><strong>Raul & Andreea</strong><span>Wedding Planner · 2027–2028</span></div>
+    </div>
+    <div class="topbar__actions">
+      <small id="syncStatus" class="sync-status">Se conectează…</small>
+      <button id="syncButton" class="button button--ghost" type="button">↻ Sincronizează</button>
+      <button id="exportExcel" class="button button--excel" type="button">⇩ Descarcă Excel</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="hero-card">
+      <div>
+        <p class="eyebrow">PLANIFICARE NUNTĂ</p>
+        <h1>Toate deciziile importante, într-un singur loc.</h1>
+        <p class="hero-copy">Invitați, săli și weekend-urile din 2027–2028, sincronizate live în foile voastre.</p>
+      </div>
+      <div class="hero-stats">
+        <article><span>Invitați</span><strong id="statGuests">0</strong><small id="statGuestPeople">0 persoane</small></article>
+        <article><span>Confirmați</span><strong id="statConfirmed">0</strong><small>înregistrări</small></article>
+        <article><span>Săli</span><strong id="statVenues">0</strong><small id="statVenueCapacity">capacitate max. —</small></article>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="Secțiuni">
+      <button class="tab is-active" data-tab="guests" type="button">Invitați</button>
+      <button class="tab" data-tab="venues" type="button">Săli de nuntă</button>
+      <button class="tab" data-tab="calendar" type="button">Calendar 2027–2028</button>
+    </nav>
+
+    <section id="tab-guests" class="tab-panel is-active">
+      <div class="section-head">
+        <div><p class="eyebrow">LISTA DE INVITAȚI</p><h2>Raul, Andreea & prieteni comuni</h2><p>Adaugă, editează și șterge invitați. Modificările se salvează live.</p></div>
+        <button id="openGuestDialog" class="button button--primary" type="button">+ Adaugă invitat</button>
+      </div>
+
+      <div class="guest-summary" id="guestSummary"></div>
+
+      <div class="toolbar">
+        <label class="search-box"><span>⌕</span><input id="guestSearch" type="search" placeholder="Caută invitat, telefon, notiță…" /></label>
+        <select id="guestStatusFilter" class="select-control">
+          <option value="">Toate statusurile</option>
+          <option value="Confirmat">Confirmat</option>
+          <option value="În așteptare">În așteptare</option>
+          <option value="Refuzat">Refuzat</option>
+        </select>
+      </div>
+
+      <div class="guest-columns">
+        <section class="panel guest-group" data-category="Invitati Raul">
+          <div class="panel__header"><div><span class="category-dot dot-raul"></span><h3>Invitați Raul</h3></div><strong id="countRaul">0</strong></div>
+          <div id="guestsRaul" class="guest-list"></div>
+        </section>
+        <section class="panel guest-group" data-category="Invitati Andreea">
+          <div class="panel__header"><div><span class="category-dot dot-andreea"></span><h3>Invitați Andreea</h3></div><strong id="countAndreea">0</strong></div>
+          <div id="guestsAndreea" class="guest-list"></div>
+        </section>
+        <section class="panel guest-group" data-category="Invitati comuni">
+          <div class="panel__header"><div><span class="category-dot dot-common"></span><h3>Invitați comuni · Prieteni</h3></div><strong id="countCommon">0</strong></div>
+          <div id="guestsCommon" class="guest-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-venues" class="tab-panel">
+      <div class="section-head">
+        <div><p class="eyebrow">SĂLI DE NUNTĂ</p><h2>Compară ofertele și disponibilitatea</h2><p>Capacitate, preț, meniu, contact, facilități și zile disponibile.</p></div>
+        <button id="openVenueDialog" class="button button--primary" type="button">+ Adaugă sală</button>
+      </div>
+      <div class="toolbar">
+        <label class="search-box"><span>⌕</span><input id="venueSearch" type="search" placeholder="Caută sală, oraș, facilitate…" /></label>
+        <select id="venueCapacityFilter" class="select-control">
+          <option value="0">Orice capacitate</option>
+          <option value="100">100+ persoane</option>
+          <option value="150">150+ persoane</option>
+          <option value="200">200+ persoane</option>
+          <option value="300">300+ persoane</option>
+        </select>
+      </div>
+      <div id="venueGrid" class="venue-grid"></div>
+    </section>
+
+    <section id="tab-calendar" class="tab-panel">
+      <div class="section-head calendar-head">
+        <div><p class="eyebrow">CALENDAR NUNTĂ</p><h2>Weekend-uri 2027–2028</h2><p>Doar sâmbăta și duminica sunt evidențiate. Selectează o zi ca să vezi sălile disponibile exact atunci.</p></div>
+        <div class="year-switch"><button class="year-button is-active" data-year="2027" type="button">2027</button><button class="year-button" data-year="2028" type="button">2028</button></div>
+      </div>
+      <div class="calendar-layout">
+        <section class="panel calendar-panel">
+          <div class="panel__header calendar-nav">
+            <button id="prevMonth" class="icon-button" type="button">‹</button>
+            <h3 id="calendarTitle">Ianuarie 2027</h3>
+            <button id="nextMonth" class="icon-button" type="button">›</button>
+          </div>
+          <div class="calendar-weekdays"><span>Lu</span><span>Ma</span><span>Mi</span><span>Jo</span><span>Vi</span><span>Sâ</span><span>Du</span></div>
+          <div id="calendarGrid" class="calendar-grid"></div>
+          <div class="calendar-legend"><span><i class="legend-box weekend"></i> Weekend</span><span><i class="legend-box available"></i> Are săli disponibile</span><span><i class="legend-box selected"></i> Zi selectată</span></div>
+        </section>
+        <aside class="panel availability-panel">
+          <div class="panel__header"><div><p class="eyebrow">DISPONIBILITATE</p><h3 id="selectedWeekendTitle">Alege un weekend</h3></div></div>
+          <div id="availabilityContent" class="availability-content"><div class="empty-state"><div>📅</div><h3>Selectează o sâmbătă sau duminică</h3><p>Vei vedea sălile disponibile în ziua aleasă și în cealaltă zi a aceluiași weekend.</p></div></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="data-tools">
+      <div><strong>Sincronizare live</strong><span>Datele sunt păstrate separat pentru invitați și săli.</span></div>
+      <div class="data-tools__actions">
+        <a class="button button--ghost" href="https://calc.domainepublic.net/286gugy2seqx" target="_blank" rel="noopener noreferrer">Invitați ↗</a>
+        <a class="button button--ghost" href="https://calc.domainepublic.net/xrplrbue3waf" target="_blank" rel="noopener noreferrer">Săli ↗</a>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="guestDialog" class="modal">
+    <form id="guestForm" method="dialog" novalidate>
+      <div class="modal__header"><div><p class="eyebrow">INVITAT</p><h2 id="guestDialogTitle">Adaugă invitat</h2></div><button id="closeGuestDialog" class="icon-button" type="button">×</button></div>
+      <input id="guestId" type="hidden" />
+      <div class="form-grid">
+        <label class="field field--full"><span>Nume / familie *</span><input id="guestName" required maxlength="120" placeholder="Ex: Familia Popescu" /></label>
+        <label class="field"><span>Categorie *</span><select id="guestCategory" required><option>Invitati Raul</option><option>Invitati Andreea</option><option>Invitati comuni</option></select></label>
+        <label class="field"><span>Status RSVP</span><select id="guestStatus"><option>În așteptare</option><option>Confirmat</option><option>Refuzat</option></select></label>
+        <label class="field"><span>Adulți</span><input id="guestAdults" type="number" min="0" step="1" value="1" /></label>
+        <label class="field"><span>Copii</span><input id="guestChildren" type="number" min="0" step="1" value="0" /></label>
+        <label class="field"><span>Telefon</span><input id="guestPhone" maxlength="40" placeholder="Opțional" /></label>
+        <label class="field"><span>Masa</span><input id="guestTable" maxlength="40" placeholder="Ex: Masa 7" /></label>
+        <label class="field field--full"><span>Preferințe / meniu</span><input id="guestMenu" maxlength="120" placeholder="Ex: vegetarian, fără gluten" /></label>
+        <label class="field field--full"><span>Notițe</span><textarea id="guestNotes" maxlength="300" rows="3" placeholder="Cazare, transport, relație, alte detalii…"></textarea></label>
+      </div>
+      <div class="modal__footer"><button id="deleteGuest" class="button button--danger-soft" type="button" hidden>Șterge</button><span class="modal-spacer"></span><button id="cancelGuest" class="button button--ghost" type="button">Renunță</button><button class="button button--primary" type="submit">Salvează</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="venueDialog" class="modal modal--wide">
+    <form id="venueForm" method="dialog" novalidate>
+      <div class="modal__header"><div><p class="eyebrow">SALĂ DE NUNTĂ</p><h2 id="venueDialogTitle">Adaugă sală</h2></div><button id="closeVenueDialog" class="icon-button" type="button">×</button></div>
+      <input id="venueId" type="hidden" />
+      <div class="form-grid">
+        <label class="field field--full"><span>Numele sălii *</span><input id="venueName" required maxlength="140" placeholder="Ex: Grand Ballroom" /></label>
+        <label class="field"><span>Oraș / localitate</span><input id="venueCity" maxlength="100" /></label>
+        <label class="field"><span>Adresă</span><input id="venueAddress" maxlength="180" /></label>
+        <label class="field"><span>Capacitate persoane *</span><input id="venueCapacity" type="number" min="1" step="1" required /></label>
+        <label class="field"><span>Preț închiriere (€)</span><input id="venuePrice" type="number" min="0" step="1" /></label>
+        <label class="field"><span>Meniu / persoană (€)</span><input id="venueMenuPrice" type="number" min="0" step="0.01" /></label>
+        <label class="field"><span>Avans (€)</span><input id="venueDeposit" type="number" min="0" step="1" /></label>
+        <label class="field"><span>Contact</span><input id="venueContact" maxlength="100" /></label>
+        <label class="field"><span>Telefon</span><input id="venuePhone" maxlength="50" /></label>
+        <label class="field"><span>Website</span><input id="venueWebsite" type="url" maxlength="200" placeholder="https://…" /></label>
+        <label class="field"><span>Parcare</span><select id="venueParking"><option value="Da">Da</option><option value="Nu">Nu</option><option value="Limitată">Limitată</option></select></label>
+        <label class="field"><span>Cazare</span><select id="venueAccommodation"><option value="Nu">Nu</option><option value="Da">Da</option><option value="În apropiere">În apropiere</option></select></label>
+        <label class="field field--full"><span>Facilități</span><input id="venueFeatures" maxlength="240" placeholder="Ex: terasă, grădină, candy bar, sonorizare, cameră miri" /></label>
+        <div class="field field--full"><span>Zile disponibile în 2027–2028</span><div class="date-adder"><input id="venueAvailabilityDate" type="date" min="2027-01-01" max="2028-12-31" /><button id="addAvailabilityDate" class="button button--soft" type="button">+ Adaugă data</button></div><div id="availabilityChips" class="date-chips"></div><small>Poți adăuga separat sâmbăta și/sau duminica pentru fiecare weekend.</small></div>
+        <label class="field field--full"><span>Notițe</span><textarea id="venueNotes" maxlength="500" rows="3" placeholder="Ce include oferta, restricții, ora limită, impresii etc."></textarea></label>
+      </div>
+      <div class="modal__footer"><button id="deleteVenue" class="button button--danger-soft" type="button" hidden>Șterge</button><span class="modal-spacer"></span><button id="cancelVenue" class="button button--ghost" type="button">Renunță</button><button class="button button--primary" type="submit">Salvează</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="app.js?v=1"></script>
+</body>
+</html>
