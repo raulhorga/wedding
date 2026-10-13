@@ -271,3 +271,17 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:inherit}
 .guest-cross-toggle input{flex:0 0 auto;width:18px;height:18px;margin:.1rem 0 0;accent-color:var(--primary)}
 .guest-cross-toggle>span{display:block}.guest-cross-toggle strong,.guest-cross-toggle small{display:block}.guest-cross-toggle strong{font-size:.72rem}.guest-cross-toggle small{margin-top:.18rem;color:var(--muted);font-size:.6rem;line-height:1.4}
 @media(max-width:720px){.crossed-badge{font-size:.42rem;padding:.06rem .22rem}.guest-cross-toggle{padding:.55rem .6rem}.guest-cross-toggle strong{font-size:.68rem}.guest-cross-toggle small{font-size:.56rem}}
+
+/* v7 — reordonare touch optimizată + retrași fixați la final */
+@media(max-width:720px), (pointer:coarse){
+  .guest-cell--name{cursor:grab;-webkit-user-select:none;user-select:none;touch-action:pan-x}
+  .guest-cell--name:active{cursor:grabbing}
+  .drag-handle{
+    width:30px;height:30px;margin:-4px 0 -4px -2px;border:1px solid #eadde2;
+    border-radius:8px;background:#faf6f8;color:#8f7781;font-size:.82rem
+  }
+  .guest-row.is-touch-dragging .guest-cell--name,
+  .guest-row--chosen .guest-cell--name{background:#fff0f5!important}
+  .guest-row--drag{opacity:.96;box-shadow:0 14px 34px rgba(55,35,43,.22);border-radius:8px!important}
+  .guest-row--ghost{opacity:.28!important}
+}

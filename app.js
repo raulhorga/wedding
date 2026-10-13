@@ -77,13 +77,45 @@ function initGuestSortable(){
   const box=map[state.activeGuestCategory];
   const filtered=!!el.guestSearch.value.trim()||!!el.guestStatusFilter.value;
   if(!box||filtered||typeof Sortable==='undefined')return;
+
+  const touchMode=window.matchMedia('(pointer: coarse)').matches||window.innerWidth<=720;
   guestSortable=Sortable.create(box,{
-    animation:150,handle:'.drag-handle',draggable:'.guest-row',ghostClass:'guest-row--ghost',chosenClass:'guest-row--chosen',dragClass:'guest-row--drag',delayOnTouchOnly:true,delay:120,touchStartThreshold:4,
+    animation:110,
+    handle:touchMode?'.guest-cell--name':'.drag-handle',
+    draggable:'.guest-row',
+    ghostClass:'guest-row--ghost',
+    chosenClass:'guest-row--chosen',
+    dragClass:'guest-row--drag',
+    forceFallback:touchMode,
+    fallbackOnBody:true,
+    fallbackTolerance:3,
+    delay:touchMode?65:0,
+    delayOnTouchOnly:false,
+    touchStartThreshold:2,
+    scroll:true,
+    scrollSensitivity:80,
+    scrollSpeed:14,
+    bubbleScroll:true,
+    onChoose:evt=>{if(touchMode)evt.item.classList.add('is-touch-dragging')},
+    onUnchoose:evt=>evt.item.classList.remove('is-touch-dragging'),
+    onMove:evt=>{
+      const dragged=state.guests.find(g=>g.id===evt.dragged?.dataset.guestId);
+      const related=state.guests.find(g=>g.id===evt.related?.dataset.guestId);
+      if(!dragged||!related)return true;
+      // Activi și retrași se ordonează separat; retrașii rămân mereu jos.
+      if(!!dragged.crossedOut!==!!related.crossedOut)return false;
+      return true;
+    },
     onEnd:async()=>{
       const ids=[...box.querySelectorAll('.guest-row')].map(r=>r.dataset.guestId).filter(Boolean);
       if(!ids.length)return;
+      const byId=new Map(state.guests.map(g=>[g.id,g]));
+      const activeIds=ids.filter(id=>!byId.get(id)?.crossedOut);
+      const crossedIds=ids.filter(id=>!!byId.get(id)?.crossedOut);
       const now=new Date().toISOString();
-      const pos=new Map(ids.map((id,i)=>[id,(i+1)*100]));
+      const pos=new Map();
+      activeIds.forEach((id,i)=>pos.set(id,(i+1)*100));
+      crossedIds.forEach((id,i)=>pos.set(id,(i+1)*100));
       state.guests=state.guests.map(g=>pos.has(g.id)?{...g,sortOrder:pos.get(g.id),updatedAt:now}:g);
       renderGuests();
       try{await saveCollection('guest');showToast('Ordinea invitaților a fost salvată.')}catch(err){console.error(err);showToast(`Ordinea nu a putut fi salvată: ${err.message}`)}
@@ -91,7 +123,7 @@ function initGuestSortable(){
   });
 }
 
-function renderGuests(){const all=activeGuests(),included=all.filter(g=>!g.crossedOut),list=filteredGuests();const map={'Invitati Raul':[el.guestsRaul,el.countRaul,el.tabCountRaul],'Invitati Andreea':[el.guestsAndreea,el.countAndreea,el.tabCountAndreea],'Invitati comuni':[el.guestsCommon,el.countCommon,el.tabCountCommon]};for(const cat of GUEST_CATEGORIES){const [box,count,tabCount]=map[cat],categoryGuests=all.filter(g=>g.category===cat),categoryIncluded=categoryGuests.filter(g=>!g.crossedOut),totalItems=categoryGuests.length,crossedItems=categoryGuests.length-categoryIncluded.length,totalPeople=categoryIncluded.reduce((sum,g)=>sum+num(g.adults)+num(g.children),0),items=cat===state.activeGuestCategory?list.slice().sort((a,b)=>{const ai=categoryGuests.indexOf(a),bi=categoryGuests.indexOf(b);return guestOrderValue(a,ai)-guestOrderValue(b,bi)||a.name.localeCompare(b.name,'ro')}):[];tabCount.textContent=totalPeople;tabCount.title=`${totalPeople} persoane active · ${totalItems} înregistrări${crossedItems?` · ${crossedItems} retrași`:''}`;count.textContent=`${totalPeople} pers.`;count.title=`${totalItems} înregistrări${crossedItems?` · ${crossedItems} retrași`:''}`;box.innerHTML='';if(cat===state.activeGuestCategory){if(!items.length)box.innerHTML='<div class="empty-list">Niciun invitat găsit în această listă.</div>';else items.forEach(g=>box.appendChild(guestRow(g)))}}
+function renderGuests(){const all=activeGuests(),included=all.filter(g=>!g.crossedOut),list=filteredGuests();const map={'Invitati Raul':[el.guestsRaul,el.countRaul,el.tabCountRaul],'Invitati Andreea':[el.guestsAndreea,el.countAndreea,el.tabCountAndreea],'Invitati comuni':[el.guestsCommon,el.countCommon,el.tabCountCommon]};for(const cat of GUEST_CATEGORIES){const [box,count,tabCount]=map[cat],categoryGuests=all.filter(g=>g.category===cat),categoryIncluded=categoryGuests.filter(g=>!g.crossedOut),totalItems=categoryGuests.length,crossedItems=categoryGuests.length-categoryIncluded.length,totalPeople=categoryIncluded.reduce((sum,g)=>sum+num(g.adults)+num(g.children),0),items=cat===state.activeGuestCategory?list.slice().sort((a,b)=>{const crossedDiff=Number(!!a.crossedOut)-Number(!!b.crossedOut);if(crossedDiff)return crossedDiff;const ai=categoryGuests.indexOf(a),bi=categoryGuests.indexOf(b);return guestOrderValue(a,ai)-guestOrderValue(b,bi)||a.name.localeCompare(b.name,'ro')}):[];tabCount.textContent=totalPeople;tabCount.title=`${totalPeople} persoane active · ${totalItems} înregistrări${crossedItems?` · ${crossedItems} retrași`:''}`;count.textContent=`${totalPeople} pers.`;count.title=`${totalItems} înregistrări${crossedItems?` · ${crossedItems} retrași`:''}`;box.innerHTML='';if(cat===state.activeGuestCategory){if(!items.length)box.innerHTML='<div class="empty-list">Niciun invitat găsit în această listă.</div>';else items.forEach(g=>box.appendChild(guestRow(g)))}}
   $$('.guest-group').forEach(p=>p.classList.toggle('is-active',p.dataset.category===state.activeGuestCategory));
   $$('.guest-category-tab').forEach(b=>b.classList.toggle('is-active',b.dataset.guestCategory===state.activeGuestCategory));
   el.openGuestDialog.textContent=`+ Adaugă la ${categoryShort(state.activeGuestCategory)}`;
@@ -108,7 +140,7 @@ function renderAvailability(){if(!state.selectedDate){el.selectedWeekendTitle.te
 function renderAll(){renderStats();renderGuests();renderVenues();renderCalendar();renderAvailability()}
 
 function openGuest(id='',category=state.activeGuestCategory){el.guestForm.reset();el.guestId.value='';el.guestAdults.value=1;el.guestChildren.value=0;el.guestStatus.value='În așteptare';el.guestCrossed.checked=false;el.guestCategory.value=category||GUEST_CATEGORIES[0];el.guestDialogTitle.textContent=`Adaugă invitat · ${categoryShort(el.guestCategory.value)}`;el.deleteGuest.hidden=true;if(id){const g=state.guests.find(x=>x.id===id);if(!g)return;el.guestId.value=g.id;el.guestName.value=g.name;el.guestCategory.value=g.category;el.guestStatus.value=g.status;el.guestAdults.value=g.adults;el.guestChildren.value=g.children;el.guestPhone.value=g.phone;el.guestTable.value=g.table;el.guestMenu.value=g.menu;el.guestNotes.value=g.notes;el.guestCrossed.checked=!!g.crossedOut;el.guestDialogTitle.textContent='Editează invitat';el.deleteGuest.hidden=false}el.guestDialog.showModal()}
-async function handleGuestSubmit(e){e.preventDefault();const name=el.guestName.value.trim(),adults=num(el.guestAdults.value),children=num(el.guestChildren.value);if(!name||adults<0||children<0){showToast('Completează numele și numărul de persoane.');return}const id=el.guestId.value||crypto.randomUUID(),old=state.guests.find(x=>x.id===id),category=el.guestCategory.value,categoryMax=Math.max(0,...activeGuests().filter(x=>x.category===category&&x.id!==id).map(x=>num(x.sortOrder))),sortOrder=old&&old.category===category&&num(old.sortOrder)>0?num(old.sortOrder):categoryMax+100,r={id,name,category,status:el.guestStatus.value,adults,children,phone:el.guestPhone.value.trim(),table:el.guestTable.value.trim(),menu:el.guestMenu.value.trim(),notes:el.guestNotes.value.trim(),crossedOut:!!el.guestCrossed.checked,sortOrder,updatedAt:new Date().toISOString(),deleted:false};state.guests=old?state.guests.map(x=>x.id===id?r:x):[...state.guests,r];el.guestDialog.close();renderAll();try{await saveCollection('guest');showToast(old?'Invitat actualizat.':'Invitat adăugat.')}catch(err){console.error(err);showToast(`Salvarea a eșuat: ${err.message}`)}}
+async function handleGuestSubmit(e){e.preventDefault();const name=el.guestName.value.trim(),adults=num(el.guestAdults.value),children=num(el.guestChildren.value);if(!name||adults<0||children<0){showToast('Completează numele și numărul de persoane.');return}const id=el.guestId.value||crypto.randomUUID(),old=state.guests.find(x=>x.id===id),category=el.guestCategory.value,crossedOut=!!el.guestCrossed.checked,statusChangedGroup=!!old&&(old.category!==category||!!old.crossedOut!==crossedOut),sameBucket=activeGuests().filter(x=>x.category===category&&!!x.crossedOut===crossedOut&&x.id!==id),bucketMax=Math.max(0,...sameBucket.map(x=>num(x.sortOrder))),sortOrder=old&&!statusChangedGroup&&num(old.sortOrder)>0?num(old.sortOrder):bucketMax+100,r={id,name,category,status:el.guestStatus.value,adults,children,phone:el.guestPhone.value.trim(),table:el.guestTable.value.trim(),menu:el.guestMenu.value.trim(),notes:el.guestNotes.value.trim(),crossedOut,sortOrder,updatedAt:new Date().toISOString(),deleted:false};state.guests=old?state.guests.map(x=>x.id===id?r:x):[...state.guests,r];el.guestDialog.close();renderAll();try{await saveCollection('guest');showToast(old?'Invitat actualizat.':'Invitat adăugat.')}catch(err){console.error(err);showToast(`Salvarea a eșuat: ${err.message}`)}}
 async function deleteGuest(){const id=el.guestId.value,g=state.guests.find(x=>x.id===id);if(!g)return;state.guests=state.guests.map(x=>x.id===id?{...x,deleted:true,updatedAt:new Date().toISOString()}:x);el.guestDialog.close();renderAll();try{await saveCollection('guest');showToast('Invitat șters.')}catch(err){console.error(err);showToast(`Ștergerea a eșuat: ${err.message}`)}}
 
 function renderDateChips(){el.availabilityChips.innerHTML='';state.venueDraftDates.slice().sort().forEach(date=>{const c=document.createElement('span');c.className='date-chip';c.innerHTML=`${esc(fmtDate(date))}<button type="button" aria-label="Elimină">×</button>`;c.querySelector('button').onclick=()=>{state.venueDraftDates=state.venueDraftDates.filter(x=>x!==date);renderDateChips()};el.availabilityChips.appendChild(c)})}
