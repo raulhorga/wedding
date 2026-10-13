@@ -9,7 +9,7 @@ const LOCAL_VENUES_KEY = 'wedding_planner_venues_v8';
 const GUEST_CATEGORIES = ['Invitati Raul','Invitati Andreea','Invitati comuni'];
 
 const state = {
-  guests: [], venues: [], syncing: false, savingGuests: false, savingVenues: false,
+  guests: [], venues: [], syncing: false, savingGuests: false, savingVenues: false, guestReorderMode: false,
   lastGuestSaveAt: 0, lastVenueSaveAt: 0,
   calendarYear: 2027, calendarMonth: 0, selectedDate: '', venueDraftDates: [], activeGuestCategory: GUEST_CATEGORIES[0]
 };
@@ -18,7 +18,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const el = {
   syncStatus:$('#syncStatus'), statGuests:$('#statGuests'), statGuestPeople:$('#statGuestPeople'), statConfirmed:$('#statConfirmed'), statVenues:$('#statVenues'), statVenueCapacity:$('#statVenueCapacity'),
-  guestSummary:$('#guestSummary'), guestSearch:$('#guestSearch'), guestStatusFilter:$('#guestStatusFilter'), guestsRaul:$('#guestsRaul'), guestsAndreea:$('#guestsAndreea'), guestsCommon:$('#guestsCommon'), countRaul:$('#countRaul'), countAndreea:$('#countAndreea'), countCommon:$('#countCommon'), tabCountRaul:$('#tabCountRaul'), tabCountAndreea:$('#tabCountAndreea'), tabCountCommon:$('#tabCountCommon'), openGuestDialog:$('#openGuestDialog'),
+  guestSummary:$('#guestSummary'), guestSearch:$('#guestSearch'), guestStatusFilter:$('#guestStatusFilter'), toggleGuestReorder:$('#toggleGuestReorder'), guestsRaul:$('#guestsRaul'), guestsAndreea:$('#guestsAndreea'), guestsCommon:$('#guestsCommon'), countRaul:$('#countRaul'), countAndreea:$('#countAndreea'), countCommon:$('#countCommon'), tabCountRaul:$('#tabCountRaul'), tabCountAndreea:$('#tabCountAndreea'), tabCountCommon:$('#tabCountCommon'), openGuestDialog:$('#openGuestDialog'),
   venueSearch:$('#venueSearch'), venueCapacityFilter:$('#venueCapacityFilter'), venueGrid:$('#venueGrid'),
   calendarTitle:$('#calendarTitle'), calendarGrid:$('#calendarGrid'), selectedWeekendTitle:$('#selectedWeekendTitle'), availabilityContent:$('#availabilityContent'),
   guestDialog:$('#guestDialog'), guestForm:$('#guestForm'), guestId:$('#guestId'), guestDialogTitle:$('#guestDialogTitle'), guestName:$('#guestName'), guestCategory:$('#guestCategory'), guestStatus:$('#guestStatus'), guestAdults:$('#guestAdults'), guestChildren:$('#guestChildren'), guestPhone:$('#guestPhone'), guestTable:$('#guestTable'), guestMenu:$('#guestMenu'), guestNotes:$('#guestNotes'), guestCrossed:$('#guestCrossed'), deleteGuest:$('#deleteGuest'),
@@ -130,30 +130,34 @@ function initGuestSortable(){
   if(!box||filtered||typeof Sortable==='undefined')return;
 
   const touchMode=window.matchMedia('(pointer: coarse)').matches||window.innerWidth<=720;
+  const dedicatedTouchReorder=touchMode&&state.guestReorderMode;
   guestSortable=Sortable.create(box,{
-    animation:110,
-    handle:touchMode?'.guest-cell--name':'.drag-handle',
+    animation:dedicatedTouchReorder?155:110,
+    handle:dedicatedTouchReorder?'.guest-row':(touchMode?'.drag-handle':'.drag-handle'),
     draggable:'.guest-row',
     ghostClass:'guest-row--ghost',
     chosenClass:'guest-row--chosen',
     dragClass:'guest-row--drag',
     forceFallback:touchMode,
     fallbackOnBody:true,
-    fallbackTolerance:3,
-    delay:touchMode?65:0,
-    delayOnTouchOnly:false,
-    touchStartThreshold:2,
+    fallbackTolerance:dedicatedTouchReorder?1:4,
+    delay:dedicatedTouchReorder?0:(touchMode?90:0),
+    delayOnTouchOnly:true,
+    touchStartThreshold:dedicatedTouchReorder?1:4,
     scroll:true,
-    scrollSensitivity:80,
-    scrollSpeed:14,
+    scrollSensitivity:dedicatedTouchReorder?120:80,
+    scrollSpeed:dedicatedTouchReorder?20:14,
     bubbleScroll:true,
+    swapThreshold:.62,
+    invertSwap:true,
+    invertedSwapThreshold:.68,
+    direction:'vertical',
     onChoose:evt=>{if(touchMode)evt.item.classList.add('is-touch-dragging')},
     onUnchoose:evt=>evt.item.classList.remove('is-touch-dragging'),
     onMove:evt=>{
       const dragged=state.guests.find(g=>g.id===evt.dragged?.dataset.guestId);
       const related=state.guests.find(g=>g.id===evt.related?.dataset.guestId);
       if(!dragged||!related)return true;
-      // Activi și retrași se ordonează separat; retrașii rămân mereu jos.
       if(!!dragged.crossedOut!==!!related.crossedOut)return false;
       return true;
     },
@@ -168,10 +172,27 @@ function initGuestSortable(){
       activeIds.forEach((id,i)=>pos.set(id,(i+1)*100));
       crossedIds.forEach((id,i)=>pos.set(id,(i+1)*100));
       state.guests=state.guests.map(g=>pos.has(g.id)?{...g,sortOrder:pos.get(g.id),updatedAt:now}:g);
+      persistLocal();
       renderGuests();
       try{await saveCollection('guest');showToast('Ordinea invitaților a fost salvată.')}catch(err){console.error(err);showToast(`Ordinea nu a putut fi salvată: ${err.message}`)}
     }
   });
+}
+
+function setGuestReorderMode(enabled){
+  state.guestReorderMode=!!enabled;
+  document.body.classList.toggle('guest-reorder-mode',state.guestReorderMode);
+  if(el.toggleGuestReorder){
+    el.toggleGuestReorder.setAttribute('aria-pressed',String(state.guestReorderMode));
+    el.toggleGuestReorder.textContent=state.guestReorderMode?'✓ Gata':'↕ Reordonează';
+    el.toggleGuestReorder.classList.toggle('is-active',state.guestReorderMode);
+  }
+  if(state.guestReorderMode){
+    el.guestSearch.value='';
+    el.guestStatusFilter.value='';
+    showToast('Mod reordonare: trage orice rând în sus sau în jos.');
+  }
+  renderGuests();
 }
 
 function renderGuests(){const all=activeGuests(),included=all.filter(g=>!g.crossedOut),list=filteredGuests();const map={'Invitati Raul':[el.guestsRaul,el.countRaul,el.tabCountRaul],'Invitati Andreea':[el.guestsAndreea,el.countAndreea,el.tabCountAndreea],'Invitati comuni':[el.guestsCommon,el.countCommon,el.tabCountCommon]};for(const cat of GUEST_CATEGORIES){const [box,count,tabCount]=map[cat],categoryGuests=all.filter(g=>g.category===cat),categoryIncluded=categoryGuests.filter(g=>!g.crossedOut),totalItems=categoryGuests.length,crossedItems=categoryGuests.length-categoryIncluded.length,totalPeople=categoryIncluded.reduce((sum,g)=>sum+num(g.adults)+num(g.children),0),items=cat===state.activeGuestCategory?list.slice().sort((a,b)=>{const crossedDiff=Number(!!a.crossedOut)-Number(!!b.crossedOut);if(crossedDiff)return crossedDiff;const ai=categoryGuests.indexOf(a),bi=categoryGuests.indexOf(b);return guestOrderValue(a,ai)-guestOrderValue(b,bi)||a.name.localeCompare(b.name,'ro')}):[];tabCount.textContent=totalPeople;tabCount.title=`${totalPeople} persoane active · ${totalItems} înregistrări${crossedItems?` · ${crossedItems} retrași`:''}`;count.textContent=`${totalPeople} pers.`;count.title=`${totalItems} înregistrări${crossedItems?` · ${crossedItems} retrași`:''}`;box.innerHTML='';if(cat===state.activeGuestCategory){if(!items.length)box.innerHTML='<div class="empty-list">Niciun invitat găsit în această listă.</div>';else items.forEach(g=>box.appendChild(guestRow(g)))}}
@@ -208,7 +229,8 @@ $$('.tab').forEach(b=>b.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('i
 $$('.year-button').forEach(b=>b.onclick=()=>{state.calendarYear=Number(b.dataset.year);state.calendarMonth=0;state.selectedDate='';$$('.year-button').forEach(x=>x.classList.toggle('is-active',x===b));renderCalendar();renderAvailability()});
 $('#prevMonth').onclick=()=>{state.calendarMonth--;if(state.calendarMonth<0){state.calendarMonth=11;state.calendarYear=Math.max(2027,state.calendarYear-1)}$$('.year-button').forEach(x=>x.classList.toggle('is-active',Number(x.dataset.year)===state.calendarYear));renderCalendar()};
 $('#nextMonth').onclick=()=>{state.calendarMonth++;if(state.calendarMonth>11){state.calendarMonth=0;state.calendarYear=Math.min(2028,state.calendarYear+1)}$$('.year-button').forEach(x=>x.classList.toggle('is-active',Number(x.dataset.year)===state.calendarYear));renderCalendar()};
-el.openGuestDialog.onclick=()=>openGuest('',state.activeGuestCategory);$$('.guest-category-tab').forEach(b=>b.onclick=()=>{state.activeGuestCategory=b.dataset.guestCategory;el.guestSearch.value='';renderGuests()});$('#closeGuestDialog').onclick=()=>el.guestDialog.close();$('#cancelGuest').onclick=()=>el.guestDialog.close();el.guestForm.addEventListener('submit',handleGuestSubmit);el.deleteGuest.onclick=deleteGuest;el.guestSearch.addEventListener('input',renderGuests);el.guestStatusFilter.addEventListener('change',renderGuests);
+el.openGuestDialog.onclick=()=>openGuest('',state.activeGuestCategory);$$('.guest-category-tab').forEach(b=>b.onclick=()=>{state.activeGuestCategory=b.dataset.guestCategory;el.guestSearch.value='';renderGuests()});$('#closeGuestDialog').onclick=()=>el.guestDialog.close();$('#cancelGuest').onclick=()=>el.guestDialog.close();el.guestForm.addEventListener('submit',handleGuestSubmit);el.deleteGuest.onclick=deleteGuest;el.guestSearch.addEventListener('input',renderGuests);
+el.toggleGuestReorder?.addEventListener('click',()=>setGuestReorderMode(!state.guestReorderMode));el.guestStatusFilter.addEventListener('change',renderGuests);
 $('#openVenueDialog').onclick=()=>openVenue();$('#closeVenueDialog').onclick=()=>el.venueDialog.close();$('#cancelVenue').onclick=()=>el.venueDialog.close();$('#addAvailabilityDate').onclick=addAvailabilityDate;el.venueForm.addEventListener('submit',handleVenueSubmit);el.deleteVenue.onclick=deleteVenue;el.venueSearch.addEventListener('input',renderVenues);el.venueCapacityFilter.addEventListener('change',renderVenues);
 $('#syncButton').onclick=()=>syncAll({notify:true});$('#exportExcel').onclick=exportExcel;
 window.addEventListener('online',()=>syncAll({notify:true}));document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAll()});setInterval(()=>{if(!document.hidden&&!state.savingGuests&&!state.savingVenues)syncAll()},SYNC_MS);
